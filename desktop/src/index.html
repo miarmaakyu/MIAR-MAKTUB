@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MIAR ÁRIA</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <h1>MIAR ÁRIA</h1>
+      <button id="new-conv-btn">+ Nova conversa</button>
+      <input type="text" id="search-box" placeholder="Buscar conversas…" />
+    </div>
+    <div id="conversations"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <div id="main">
+    <header id="topbar">
+      <button id="toggle-sidebar" title="Menu">☰</button>
+      <span id="conv-title" title="Clique para renomear">MIAR ÁRIA</span>
+      <span id="ai-status">Sem chave</span>
+      <span id="api-counter" title="Chamadas de API realizadas" style="font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:2px 7px;cursor:default;user-select:none">API: 0</span>
+      <span id="clock" style="font-size:12px;font-family:monospace;color:var(--text2);letter-spacing:0.5px;user-select:none">00:00:00</span>
+      <button id="stop-tts-btn" title="Parar fala (Esc)" onclick="stopSpeech()" style="display:none">⏹</button>
+      <button id="memory-btn" title="Memórias" onclick="openMemoryModal()">🧠</button>
+      <button id="maintenance-btn" title="Manutenção">🔧</button>
+      <button id="settings-btn" title="Configurações">⚙</button>
+      <span id="app-version" style="font-size:10px;opacity:0.4;margin-left:2px;align-self:center"></span>
+    </header>
+
+    <!-- Barra de atualização — aparece só quando há update pronto -->
+    <div id="update-bar" style="display:none">
+      <span>⬆ Atualização pronta</span>
+      <button onclick="window.miar.installUpdate()">Reiniciar e instalar</button>
+      <button onclick="document.getElementById('update-bar').style.display='none'">✕</button>
+    </div>
+
+    <div id="messages">
+      <div id="empty-state">
+        <h2>MIAR ÁRIA</h2>
+        <p>Assistente de IA com voz, microfone e memória local.</p>
+        <div class="empty-hint">Configure sua chave de IA em ⚙ Configurações para começar.</div>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <div id="attachments-preview"></div>
+      <div id="input-row">
+        <button class="icon-btn" id="attach-btn" title="Anexar arquivo">📎</button>
+        <button class="icon-btn" id="folder-btn" title="Selecionar pasta">📁</button>
+        <button class="icon-btn" id="mic-btn" title="Microfone">🎤</button>
+        <button class="icon-btn" id="tts-btn" title="Voz ligada/desligada">🔈</button>
+        <span id="mic-status"></span>
+        <textarea id="message-input" placeholder="Digite sua mensagem…" rows="1"></textarea>
+        <button class="icon-btn" id="abort-btn" title="Cancelar resposta da IA" style="display:none;border-radius:12px;width:44px;height:44px;background:var(--error,#c0392b);color:#fff;font-size:18px">⏹</button>
+        <button class="icon-btn" id="send-btn" style="border-radius:12px;width:44px;height:44px;" title="Enviar">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay hidden" id="settings-modal">
+  <div class="modal">
+    <h2>⚙ Configurações</h2>
+
+    <div class="modal-section">
+      <h3>Minha Conta</h3>
+      <div class="modal-row">
+        <label>E-mail</label>
+        <input type="email" id="user-email" placeholder="seu@email.com" autocomplete="off" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text1);padding:6px 10px;font-size:13px" />
+      </div>
+      <p style="font-size:11px;color:var(--text3);margin-top:4px">Salvo localmente. Use para lembrar qual e-mail criou cada conta de API.</p>
+    </div>
+
+    <div class="modal-section">
+      <h3>Chaves de IA</h3>
+      <p style="font-size:12px;color:var(--text3)">Cole uma ou várias chaves — uma por linha ou separadas por vírgula. Salvas localmente, nunca enviadas a terceiros.</p>
+
+      <!-- GROQ -->
+      <div class="key-row" id="key-groq">
+        <div class="key-row-header">
+          <span class="key-label">🟣 Groq <a href="https://console.groq.com/keys" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;margin-left:6px" title="Pegar/renovar chave Groq">🔗 Pegar chave</a></span>
+          <span class="key-badge unset" id="groq-badge">Nenhuma</span>
+          <button class="btn-clear-keys hidden" id="groq-clear" onclick="clearProviderKeys('groq')">🗑 Apagar tudo</button>
+        </div>
+        <div id="groq-keys-list" class="saved-keys-list"></div>
+        <div class="key-add-row">
+          <textarea id="groq-textarea" class="key-textarea" placeholder="Cole aqui — uma chave por linha ou separadas por vírgula&#10;gsk_aaa...&#10;gsk_bbb...&#10;gsk_ccc..." rows="2" autocomplete="off" spellcheck="false"></textarea>
+          <div style="display:flex;gap:6px;margin-top:5px">
+            <button class="btn btn-secondary btn-small" onclick="testKeyFromTextarea('groq')">Testar</button>
+            <button class="btn btn-primary btn-small" onclick="saveKeyTextarea('groq')">Adicionar</button>
+          </div>
+        </div>
+        <div class="key-result hidden" id="groq-result"></div>
+      </div>
+
+      <!-- GEMINI -->
+      <div class="key-row" id="key-gemini">
+        <div class="key-row-header">
+          <span class="key-label">🔵 Gemini <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;margin-left:6px" title="Pegar/renovar chave Gemini">🔗 Pegar chave</a></span>
+          <span class="key-badge unset" id="gemini-badge">Nenhuma</span>
+          <button class="btn-clear-keys hidden" id="gemini-clear" onclick="clearProviderKeys('gemini')">🗑 Apagar tudo</button>
+        </div>
+        <div id="gemini-keys-list" class="saved-keys-list"></div>
+        <div class="key-add-row">
+          <textarea id="gemini-textarea" class="key-textarea" placeholder="Cole aqui — AIza... (uma por linha ou vírgula)" rows="2" autocomplete="off" spellcheck="false"></textarea>
+          <div style="display:flex;gap:6px;margin-top:5px">
+            <button class="btn btn-secondary btn-small" onclick="testKeyFromTextarea('gemini')">Testar</button>
+            <button class="btn btn-primary btn-small" onclick="saveKeyTextarea('gemini')">Adicionar</button>
+          </div>
+        </div>
+        <div class="key-result hidden" id="gemini-result"></div>
+      </div>
+
+      <!-- OPENROUTER -->
+      <div class="key-row" id="key-openrouter">
+        <div class="key-row-header">
+          <span class="key-label">🟤 OpenRouter <a href="https://openrouter.ai/settings/keys" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;margin-left:6px" title="Pegar/renovar chave OpenRouter">🔗 Pegar chave</a></span>
+          <span class="key-badge unset" id="openrouter-badge">Nenhuma</span>
+          <button class="btn-clear-keys hidden" id="openrouter-clear" onclick="clearProviderKeys('openrouter')">🗑 Apagar tudo</button>
+        </div>
+        <div id="openrouter-keys-list" class="saved-keys-list"></div>
+        <div class="key-add-row">
+          <textarea id="openrouter-textarea" class="key-textarea" placeholder="Cole aqui — sk-or-v1-... (uma por linha ou vírgula)" rows="2" autocomplete="off" spellcheck="false"></textarea>
+          <div style="display:flex;gap:6px;margin-top:5px">
+            <button class="btn btn-secondary btn-small" onclick="testKeyFromTextarea('openrouter')">Testar</button>
+            <button class="btn btn-primary btn-small" onclick="saveKeyTextarea('openrouter')">Adicionar</button>
+          </div>
+        </div>
+        <div class="key-result hidden" id="openrouter-result"></div>
+      </div>
+
+      <!-- MEM0 -->
+      <div class="key-row" id="key-mem0">
+        <div class="key-row-header">
+          <span class="key-label">⚪ Mem0 <span style="font-size:11px;color:var(--text3)">(opcional)</span></span>
+          <span class="key-badge unset" id="mem0-badge">Nenhuma</span>
+          <button class="btn-clear-keys hidden" id="mem0-clear" onclick="clearProviderKeys('mem0')">🗑 Apagar</button>
+        </div>
+        <div id="mem0-keys-list" class="saved-keys-list"></div>
+        <div class="key-input-row">
+          <input type="password" id="mem0-key-input" placeholder="Token do Mem0" autocomplete="off" />
+          <button class="btn btn-primary btn-small" onclick="saveMem0Key()">Salvar</button>
+        </div>
+        <div class="key-result hidden" id="mem0-result"></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Instruções Fixas</h3>
+      <div class="modal-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <label style="font-size:12px;color:var(--text2)">Estas instruções são adicionadas ao início de <strong>toda</strong> conversa. Use para programar comportamento, tom, preferências permanentes.</label>
+        <textarea id="custom-instructions" rows="6" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text1);padding:8px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box" placeholder="Ex: Sempre responda em linguagem técnica. Prefira soluções Python. Trate Robson por nome…"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Voz (TTS)</h3>
+      <div class="modal-row">
+        <label>Voz</label>
+        <select id="voice-select"><option value="">Carregando…</option></select>
+      </div>
+      <div class="modal-row">
+        <label>Velocidade</label>
+        <input type="range" id="tts-rate" min="0.5" max="3" step="0.1" value="1.0" />
+        <span id="tts-rate-val" style="min-width:30px;font-size:12px;color:var(--text2)">1.0</span>
+      </div>
+      <div class="modal-row">
+        <label>Tom</label>
+        <input type="range" id="tts-pitch" min="0.5" max="2" step="0.1" value="1.1" />
+        <span id="tts-pitch-val" style="min-width:30px;font-size:12px;color:var(--text2)">1.1</span>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('settings-modal')">Fechar</button>
+      <button class="btn btn-primary" onclick="saveAllSettings()">Salvar configurações</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOLDER MODAL -->
+<div class="modal-overlay hidden" id="folder-modal">
+  <div class="modal">
+    <h2>📁 Pasta autorizada</h2>
+    <p id="folder-path-label" style="font-size:13px;color:var(--accent2)"></p>
+    <p style="font-size:12px;color:var(--text3)">Selecione os arquivos para incluir no contexto desta mensagem:</p>
+    <div class="folder-files" id="folder-files-list"></div>
+    <div class="modal-footer">
+      <span id="folder-selected-count" style="font-size:12px;color:var(--text2);flex:1"></span>
+      <button class="btn btn-secondary" onclick="closeModal('folder-modal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmFolderFiles()">Adicionar selecionados</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE MODAL -->
+<div class="modal-overlay hidden" id="maintenance-modal">
+  <div class="modal" style="width:660px">
+    <h2>🔧 Modo Manutenção</h2>
+    <p style="font-size:12px;color:var(--text3)">Diagnóstico seguro. Nenhuma alteração é feita sem sua autorização explícita.</p>
+
+    <div class="modal-section">
+      <h3>Status do app</h3>
+      <div class="maintenance-section">
+        <pre id="maintenance-structure">Carregando…</pre>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Logs recentes</h3>
+      <div class="maintenance-section">
+        <pre id="maintenance-logs">Carregando…</pre>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Diagnóstico com IA</h3>
+      <p style="font-size:12px;color:var(--text3)">Descreva o problema e a IA analisará a estrutura do app e sugerirá correções para sua revisão.</p>
+      <textarea id="maintenance-prompt" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;min-height:70px;font-family:inherit" placeholder="Ex: O microfone não está funcionando…"></textarea>
+      <button class="btn btn-primary" onclick="runMaintenanceDiagnosis()">Analisar com IA</button>
+      <div id="maintenance-result" style="margin-top:8px;font-size:13px;white-space:pre-wrap;color:var(--text2)"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="createBackup()">💾 Criar backup</button>
+      <span id="backup-status" style="font-size:12px;color:var(--text2);flex:1"></span>
+      <button class="btn btn-secondary" onclick="closeModal('maintenance-modal')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEMORY MODAL -->
+<div class="modal-overlay hidden" id="memory-modal">
+  <div class="modal" style="width:600px">
+    <h2>🧠 Memórias da MIAR ÁRIA</h2>
+    <p style="font-size:12px;color:var(--text3)">Memórias extraídas automaticamente das suas conversas. Você pode visualizar, editar e apagar.</p>
+
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="text" id="memory-search-input" placeholder="Buscar memórias…" style="flex:1" oninput="loadMemories(document.getElementById('memory-category-filter').value, this.value)" />
+      <select id="memory-category-filter" onchange="loadMemories(this.value, document.getElementById('memory-search-input').value)">
+        <option value="todas">Todas</option>
+        <option value="perfil">Perfil</option>
+        <option value="projetos">Projetos</option>
+        <option value="preferencias">Preferências</option>
+        <option value="arquivos">Arquivos</option>
+        <option value="decisoes">Decisões</option>
+        <option value="rotinas">Rotinas</option>
+        <option value="ideias">Ideias</option>
+        <option value="geral">Geral</option>
+      </select>
+    </div>
+
+    <div id="memory-stats" style="font-size:12px;color:var(--text3)"></div>
+    <div id="memory-list" style="max-height:350px;overflow-y:auto"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-small" onclick="clearAllMemories()">🗑 Apagar todas</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-secondary" onclick="closeModal('memory-modal')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script src="renderer.js"></script>
+</body>
+</html>
