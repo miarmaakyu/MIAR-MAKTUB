@@ -20,6 +20,38 @@ const state = {
   voices: [],
 };
 
+// ── TEMA DIA / NOITE / SISTEMA ────────────────────────────────────────────────
+const THEMES = ['dark', 'light', 'system'];
+const THEME_LABELS = { dark: '🌙 Noite', light: '☀️ Dia', system: '🖥️ Sistema' };
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  } else {
+    root.setAttribute('data-theme', theme);
+  }
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = THEME_LABELS[theme] || '🌙 Noite';
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('miar-theme') || 'dark';
+  applyTheme(saved);
+  // Reage a mudança do sistema quando no modo "system"
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if ((localStorage.getItem('miar-theme') || 'dark') === 'system') applyTheme('system');
+  });
+}
+
+window.cycleTheme = function () {
+  const current = localStorage.getItem('miar-theme') || 'dark';
+  const next = THEMES[(THEMES.indexOf(current) + 1) % THEMES.length];
+  localStorage.setItem('miar-theme', next);
+  applyTheme(next);
+};
+
 // ── CLOCK HH:MM:SS ────────────────────────────────────────────────────────────
 function startClock() {
   function tick() {
@@ -42,13 +74,14 @@ async function refreshApiCounter() {
     const el = document.getElementById('api-counter');
     if (el) {
       el.textContent = `API: ${stats.total}`;
-      el.title = `Total: ${stats.total} chamadas\nGroq: ${stats.groq.chamadas} (${stats.groq.percentual})\nGemini: ${stats.gemini.chamadas} (${stats.gemini.percentual})\nOpenRouter: ${stats.openrouter.chamadas} (${stats.openrouter.percentual})\nErros: ${stats.erros.chamadas}`;
+      el.title = `Total: ${stats.total} chamadas\nGroq: ${stats.groq.chamadas} (${stats.groq.percentual})\nGemini: ${stats.gemini.chamadas} (${stats.gemini.percentual})\nMistral: ${stats.mistral.chamadas} (${stats.mistral.percentual})\nOpenRouter: ${stats.openrouter.chamadas} (${stats.openrouter.percentual})\nErros: ${stats.erros.chamadas}`;
     }
   } catch {}
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   startClock();
   loadVoices();
   if (window.speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
@@ -144,7 +177,7 @@ async function loadSettings() {
   if (rateEl) { rateEl.value = state.ttsRate; document.getElementById('tts-rate-val').textContent = state.ttsRate; }
   if (pitchEl) { pitchEl.value = state.ttsPitch; document.getElementById('tts-pitch-val').textContent = state.ttsPitch; }
 
-  for (const provider of ['groq', 'gemini', 'openrouter', 'mem0']) {
+  for (const provider of ['groq', 'gemini', 'openrouter', 'mistral', 'mem0']) {
     const badge    = document.getElementById(`${provider}-badge`);
     const clearBtn = document.getElementById(`${provider}-clear`);
     const list     = document.getElementById(`${provider}-keys-list`);
@@ -607,11 +640,12 @@ async function updateAiStatus() {
   const el = document.getElementById('ai-status');
   try {
     const s = await window.miar.getKeyStatus();
-    const total = (s.groq?.count || 0) + (s.gemini?.count || 0) + (s.openrouter?.count || 0);
+    const total = (s.groq?.count || 0) + (s.gemini?.count || 0) + (s.openrouter?.count || 0) + (s.mistral?.count || 0);
     if (total === 0) { el.textContent = 'Sem chave'; el.className = 'ai-status error'; return; }
     const parts = [];
-    if (s.groq?.count) parts.push(`Groq×${s.groq.count}`);
-    if (s.gemini?.count) parts.push(`Gemini×${s.gemini.count}`);
+    if (s.groq?.count)       parts.push(`Groq×${s.groq.count}`);
+    if (s.gemini?.count)     parts.push(`Gemini×${s.gemini.count}`);
+    if (s.mistral?.count)    parts.push(`Mistral×${s.mistral.count}`);
     if (s.openrouter?.count) parts.push(`OR×${s.openrouter.count}`);
     el.textContent = parts.join(' · ');
     el.className = 'ai-status ok';
@@ -851,7 +885,7 @@ function setupEventListeners() {
 
   document.getElementById('toggle-sidebar').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('collapsed'));
   document.getElementById('settings-btn').addEventListener('click', window.openSettingsModal);
-  document.getElementById('maintenance-btn').addEventListener('click', window.openMaintenanceModal);
+  // maintenance-btn foi movido para dentro do modal de settings
   document.getElementById('attach-btn').addEventListener('click', handleAttach);
   document.getElementById('folder-btn').addEventListener('click', handleFolder);
   document.getElementById('mic-btn').addEventListener('click', toggleMic);
